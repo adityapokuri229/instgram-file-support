@@ -1,4 +1,4 @@
-# Instagram File Sharer
+# Instagram File Support
 
 A Chrome extension that allows you to share files on Instagram DM using Filebin's free file hosting service.
 
