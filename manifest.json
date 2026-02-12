@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Instagram File Sharer",
+  "name": "Instagram File Support",
   "version": "1.0.0",
   "description": "Share files on Instagram DM using Filebin",
+  "author": "Aditya Pokuri",
   "permissions": [
     "storage"
   ],
