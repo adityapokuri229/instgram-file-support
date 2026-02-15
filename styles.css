@@ -126,3 +126,8 @@
     transform: rotate(360deg);
   }
 }
+
+/* Download modal spinner */
+@keyframes fb-spin {
+  to { transform: rotate(360deg); }
+}

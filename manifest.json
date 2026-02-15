@@ -1,11 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Instagram File Support",
-  "version": "1.0.0",
-  "description": "Share files on Instagram DM using Filebin",
+  "short_name": "IGFileShare",
+  "version": "1.1.0",
+  "description": "Share files in Instagram DMs via Filebin API. Upload files and let recipients download without leaving Instagram.",
   "author": "Aditya Pokuri",
   "permissions": [
-    "storage"
+    "storage",
+    "downloads"
   ],
   "host_permissions": [
     "https://www.instagram.com/*",
@@ -26,5 +28,13 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Instagram File Support"
   }
 }

@@ -1,77 +1,114 @@
-// Background Service Worker - Handles file uploads
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'uploadFile') {
-    handleFileUpload(request.file, request.binId, request.filename, sender.tab.id)
-      .then(result => sendResponse({ success: true, url: result }))
-      .catch(error => sendResponse({ success: false, error: error.message }));
-    return true; // Will respond asynchronously
-  }
+/**
+ * Instagram File Support - Background Service Worker
+ * Author: Aditya Pokuri
+ * Version: 1.3.0
+ */
+
+// ── Upload via long-lived port ─────────────────────────────────────────────
+//
+// Chunks arrive as Uint8Array (NOT transferred ArrayBuffer — transferring
+// detaches the buffer on the sender side making it empty on arrival).
+// We store each chunk's bytes and assemble into one Blob before uploading.
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'upload') return;
+
+  let meta = null;
+  const chunks = [];
+
+  port.onMessage.addListener(async (msg) => {
+
+    if (msg.type === 'start') {
+      meta = msg;
+      return;
+    }
+
+    if (msg.type === 'chunk') {
+      // Decode base64 chunk back to Uint8Array
+      const binary = atob(msg.base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      chunks[msg.index] = bytes;
+      const received = chunks.filter(Boolean).length;
+      const pct = Math.round((received / meta.totalChunks) * 20);
+      try { port.postMessage({ type: 'progress', progress: pct }); } catch (_) {}
+      return;
+    }
+
+    if (msg.type === 'done') {
+      try {
+        const blob = new Blob(chunks, {
+          type: meta.mimeType || 'application/octet-stream'
+        });
+
+        const url = `https://filebin.net/${meta.binId}/${encodeURIComponent(meta.filename)}`;
+
+        let progress = 20;
+        const iv = setInterval(() => {
+          const step = progress < 50 ? 5 : progress < 75 ? 3 : progress < 88 ? 1 : 0;
+          progress = Math.min(progress + step, 90);
+          try { port.postMessage({ type: 'progress', progress }); } catch (_) {}
+          if (progress >= 90) clearInterval(iv);
+        }, 300);
+
+        const res = await fetch(url, {
+          method: 'POST',
+          body: blob,
+          headers: {
+            'Content-Type': meta.mimeType || 'application/octet-stream',
+            'Content-Length': String(blob.size)
+          }
+        });
+
+        clearInterval(iv);
+
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          throw new Error(`${res.status} ${res.statusText}${body ? ': ' + body : ''}`);
+        }
+
+        try { port.postMessage({ type: 'progress', progress: 100 }); } catch (_) {}
+        try { port.postMessage({ type: 'success', url: `https://filebin.net/${meta.binId}/` }); } catch (_) {}
+
+      } catch (err) {
+        try { port.postMessage({ type: 'error', message: err.message }); } catch (_) {}
+      }
+    }
+  });
 });
 
-async function handleFileUpload(fileData, binId, filename, tabId) {
-  const url = `https://filebin.net/${binId}/${encodeURIComponent(filename)}`;
-  
-  // Convert base64 back to blob
-  const base64Data = fileData.split(',')[1];
-  const byteCharacters = atob(base64Data);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
+// ── sendMessage handlers (file list + downloads) ───────────────────────────
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+
+  if (request.action === 'fetchBinFiles') {
+    fetch(`https://filebin.net/${request.binId}`, {
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(r => r.json())
+      .then(data => sendResponse({ success: true, files: (data.files || []).map(f => f.filename) }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
   }
-  const byteArray = new Uint8Array(byteNumbers);
-  const blob = new Blob([byteArray]);
-  const totalSize = blob.size;
-  
-  // Simulate progress since we can't track it with fetch in service worker
-  let uploadedSize = 0;
-  const progressInterval = setInterval(() => {
-    uploadedSize += totalSize / 20; // Increment by 5%
-    const percentage = Math.min(Math.round((uploadedSize / totalSize) * 100), 95);
-    
-    // Safely send message, ignore errors if tab is closed
-    try {
-      chrome.tabs.sendMessage(tabId, {
-        action: 'uploadProgress',
-        progress: percentage
-      }).catch(() => {});
-    } catch (e) {
-      clearInterval(progressInterval);
-    }
-    
-    if (percentage >= 95) {
-      clearInterval(progressInterval);
-    }
-  }, 150);
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      body: blob,
-      headers: {
-        'Content-Type': fileData.split(';')[0].split(':')[1] || 'application/octet-stream'
-      }
-    });
-
-    clearInterval(progressInterval);
-    
-    // Send 100% progress safely
-    try {
-      chrome.tabs.sendMessage(tabId, {
-        action: 'uploadProgress',
-        progress: 100
-      }).catch(() => {});
-    } catch (e) {
-      // Ignore if tab is closed
-    }
-
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
-    }
-
-    // Return only the bin URL, not the full file URL
-    return `https://filebin.net/${binId}/`;
-  } catch (error) {
-    clearInterval(progressInterval);
-    throw error;
+  if (request.action === 'downloadFile') {
+    chrome.downloads.download(
+      { url: request.url, filename: request.filename, saveAs: false },
+      (id) => sendResponse(chrome.runtime.lastError
+        ? { success: false, error: chrome.runtime.lastError.message }
+        : { success: true, downloadId: id })
+    );
+    return true;
   }
-}
+
+  if (request.action === 'downloadZip') {
+    chrome.downloads.download(
+      { url: `https://filebin.net/archive/${request.binId}/zip`, filename: `files-${request.binId}.zip`, saveAs: false },
+      (id) => sendResponse(chrome.runtime.lastError
+        ? { success: false, error: chrome.runtime.lastError.message }
+        : { success: true, downloadId: id })
+    );
+    return true;
+  }
+
+});
