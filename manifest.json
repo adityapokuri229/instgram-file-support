@@ -37,6 +37,3 @@
     "default_title": "Instagram File Support"
   }
 }
-```
-
-**Key change:** Removed `"storage"` from permissions — we never use `chrome.storage` API in the code, and this permission triggers Chrome Web Store's privacy policy requirement.
