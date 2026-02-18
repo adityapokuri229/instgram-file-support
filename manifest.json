@@ -1,12 +1,12 @@
+```json
 {
   "manifest_version": 3,
   "name": "Instagram File Support",
   "short_name": "IGFileShare",
   "version": "1.1.0",
-  "description": "Share files in Instagram DMs via Filebin API. Upload files and let recipients download without leaving Instagram.",
+  "description": "Share files in Instagram DMs via Filebin. Upload and download files directly in Instagram.",
   "author": "Aditya Pokuri",
   "permissions": [
-    "storage",
     "downloads"
   ],
   "host_permissions": [
@@ -38,3 +38,6 @@
     "default_title": "Instagram File Support"
   }
 }
+```
+
+**Key change:** Removed `"storage"` from permissions — we never use `chrome.storage` API in the code, and this permission triggers Chrome Web Store's privacy policy requirement.
