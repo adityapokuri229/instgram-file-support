@@ -1,8 +1,15 @@
 /**
  * Instagram File Support - Background Service Worker
  * Author: Aditya Pokuri
- * Version: 1.3.0
+ * Version: 1.1.1
  */
+
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install') {
+    chrome.tabs.create({ url: 'https://instafilesupport.netlify.app' });
+  }
+});
+
 
 // ── Upload via long-lived port ─────────────────────────────────────────────
 //

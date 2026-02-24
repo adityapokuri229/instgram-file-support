@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Instagram File Support",
   "short_name": "IGFileShare",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Share files in Instagram DMs via Filebin. Upload and download files directly in Instagram.",
   "author": "Aditya Pokuri",
   "permissions": [
